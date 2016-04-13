@@ -2,10 +2,10 @@ import socket
 
 HOST = 'localhost'    # chat server IP
 PORT = 50007              # port as used by the server
-
+Grp_Info={}
+ClientId_IP={}
 #create an INET, STREAMing socket
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
 s.bind((HOST,PORT)) 
 s.listen(5) 
 while True:
