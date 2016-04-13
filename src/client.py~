@@ -2,7 +2,7 @@ import socket
 print "Please Enter your user ID"
 uid=raw_input()
 
-HOST = 'localhost'    # chat server IP
+HOST = '10.145.14.232'    # chat server IP
 PORT = 50007              # port as used by the server
 
 #create an INET, STREAMing socket
