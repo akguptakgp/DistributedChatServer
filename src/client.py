@@ -31,3 +31,9 @@ while(1):
 #now connect to the web server on port 80
 # - the normal http port
 s.connect(("www.mcmillan-inc.com", 80))
+
+def cbcast():
+	print "Ankit has to implement it"
+
+def abcast():
+	print "Achyuta has to implement it"
