@@ -1,0 +1,51 @@
+from functools import partial
+import tkMessageBox
+import Tkinter as tk
+
+def action(atm,textr):
+		print atm
+		print textr.get("1.0",tk.END)
+
+class Window(tk.Frame):
+	def __init__(self,parent):
+		tk.Frame.__init__(self, parent)
+
+		self.frame1=tk.Frame(root)
+		self.frame1.pack(side=tk.TOP)
+		self.frame2=tk.Frame(root)
+		self.frame2.pack(side=tk.BOTTOM)
+
+		self.text_show=tk.Text(self.frame1,height=40,width=20)
+		self.text_show.pack(side=tk.LEFT,pady=15,padx=15)
+		self.refresh=tk.Button(self.frame1,text="Refresh")
+		self.refresh.pack(pady=30)
+		self.Group_list=tk.Listbox(self.frame1)
+		self.Group_list.pack(padx=15)
+
+		self.text_type=tk.Text(self.frame2,height=2,width=20)
+		self.text_type.pack(side=tk.LEFT,pady=15,padx=15)
+		self.send=tk.Button(self.frame2,text="Send",command=partial(action,1,self.text_type))
+		self.send.pack(side=tk.LEFT)
+		self.join=tk.Button(self.frame2,text="Join",command=partial(action,2,self.text_type))
+		self.join.pack(side=tk.LEFT)
+		self.Make=tk.Button(self.frame2,text="Make Group",command=partial(action,3,self.text_type))
+		self.Make.pack(side=tk.LEFT)
+
+	def fetch_data(self):
+		return self.text_type.get()
+
+	def print_list(self,datalist):
+		for items in datalist:
+			self.text_show.insert(tk.END, items+'\n')
+		return
+	def print_line(self,data):
+		self.text_show.insert(tk.END,data+'\n')
+
+
+
+root=tk.Tk()
+app = Window(root)
+list=["akash","gourav","achutya","ankit"]
+app.print_list(list)
+root.mainloop()
+

@@ -4,101 +4,7 @@ import random
 from datetime import datetime
 import sys
 import time
-from functools import partial
-import tkMessageBox
-import Tkinter as tk
-import select
 import copy
-
-
-class Window(tk.Frame):
-	def __init__(self,parent,client_object):
-		tk.Frame.__init__(self, parent)
-		self.selected_gid=1
-		self.frame1=tk.Frame(parent)
-		self.frame1.pack(side=tk.TOP)
-		self.frame2=tk.Frame(parent)
-		self.frame2.pack(side=tk.BOTTOM)
-
-		self.text_show=tk.Text(self.frame1,height=40,width=20)
-		self.text_show.pack(side=tk.LEFT,pady=15,padx=15)
-		self.Group_list=tk.Listbox(self.frame1,selectmode=tk.SINGLE)
-		self.Group_list.pack(padx=15,pady=30)
-
-		self.text_type=tk.Text(self.frame2,height=2,width=20)
-		self.text_type.pack(side=tk.LEFT,pady=15,padx=15)
-		self.refresh=tk.Button(self.frame1,text="Refresh")
-		self.refresh=tk.Button(self.frame1,text="Refresh",command=partial(self.disp_group))
-		self.refresh.pack(pady=30)
-		self.opp=tk.Button(self.frame1,text="Open Chat",command=partial(self.open_group))
-		self.opp.pack(pady=30)
-
-		self.logout=tk.Button(self.frame1,text="Logout",command=partial(client_object.action,5))
-		self.logout.pack(side=tk.BOTTOM)		
-		self.send=tk.Button(self.frame2,text="Send",command=partial(client_object.action,3,self.text_type,str(self.selected_gid)))
-		self.send.pack(side=tk.LEFT)
-		self.join=tk.Button(self.frame2,text="Join",command=partial(client_object.action,2,self.text_type))
-		self.join.pack(side=tk.LEFT)
-		self.Make=tk.Button(self.frame2,text="Make Group",command=partial(client_object.action,1,self.text_type))
-		self.Make.pack(side=tk.LEFT)
-		self.leave=tk.Button(self.frame1,text="Leave",command=partial(client_object.action,4,self.text_type))
-		self.leave.pack(side=tk.BOTTOM)
-		self.save_client=client_object
-		self.display_list=[]
-
-	def fetch_data(self):
-		return self.text_type.get()
-
-	def print_list(self,datalist):
-		for items in datalist:
-			self.text_show.insert(tk.END, items+'\n')
-		return
-	def print_line(self,data):
-		self.text_show.insert(tk.END,data+'\n')
-
-	def open_group(self,custom_selection=None):
-		tr=self.Group_list.curselection()
-		if(custom_selection==None):
-			if(len(tr)==0):
-				print "Please select some group"
-				return
-		elif(custom_selection!=None):
-			custom_selection=int(custom_selection)-1
-			print custom_selection
-			print self.display_list[custom_selection][6:7]
-			print self.save_client.Grp_Info[self.display_list[custom_selection][6:7]]
-			gid=self.display_list[custom_selection][6:7]
-			self.selected_gid=gid
-			self.text_show.delete("1.0",tk.END)
-			if gid not in self.save_client.ChattingTable:
-				return
-			self.text_show.insert(tk.END, "chatting history of group:"+gid+'\n')
-			for i in self.save_client.ChattingTable[gid]:
-				print i
-				self.text_show.insert(tk.END, i+'\n')
-			return	
-
-		print self.display_list[tr[0]][6:7]
-		print self.save_client.Grp_Info[self.display_list[tr[0]][6:7]]
-		gid=self.display_list[tr[0]][6:7]
-		self.selected_gid=gid
-		self.text_show.delete("1.0",tk.END)
-		if gid not in self.save_client.ChattingTable:
-			return
-		self.text_show.insert(tk.END, "chatting history of group:"+gid+'\n')
-		for i in self.save_client.ChattingTable[gid]:
-			print i
-			self.text_show.insert(tk.END, i+'\n')
-
-	def disp_group(self):
-		self.Group_list.delete(0,tk.END)
-		self.display_list=[]
-		for item in self.save_client.Grp_Info:
-			self.display_list.append('group:'+item)
-			to_insert='group:'+item+'->'
-			for el in self.save_client.Grp_Info[item]:
-				to_insert+=el+','
-			self.Group_list.insert(tk.END,to_insert[:-1])	
 
 
 class VectorClock(object):
@@ -154,10 +60,7 @@ class Client(object): # for logout, login for the time assume no logout because 
 		self.uidRecord = []
 		self.clientIp='localhost'
 		# Create two threads as follows
-		self.thread1=True
-		self.gui=None
 		Thread(target=self.execute, args=()).start()
-		self.thread2=True
 		Thread(target=self.RecvAndServe, args=()).start()	
 
 	# msg : string
@@ -184,56 +87,57 @@ class Client(object): # for logout, login for the time assume no logout because 
 		else:
 			self.cbcastSend(gid,msg,False)
 
-	def action(self,opt,textr=None,selected_gid=None):
-		print "select option 1,2,3[create,join,chat]"
-		print type(opt)
-		if(opt==1):
-			gid=textr.get("1.0",'end-1c')
-			print "joinig Group Id ",gid
-			self.Send_message('join',gid)
-		elif(opt==2):
-			gid=textr.get("1.0",'end-1c')
-			print "joinig Group Id ",gid
-			self.Send_message('join',gid)
-		elif(opt==3):
-			tr=self.gui.Group_list.curselection()
-			if(len(tr)==0):
-				print "Please select some group"
-				return
-			gid=self.gui.display_list[tr[0]][6:7]
-			msg=textr.get("1.0",'end-1c')
-			print "send message ",msg," to ",gid
-			self.abcastSend(gid,msg)
-		elif(opt==4):
-			gid=textr.get("1.0",'end-1c')
-			print "leaving Group Id ",gid
-			self.Send_message('leave',gid)
-		elif(opt==5): # logout
-			self.thread1=False
-			self.thread2=False
-			sys.exit(0)
-		print textr.get("1.0",'end-1c')
-		textr.delete("1.0",tk.END)		
+
 
 	def execute(self):
 		print "thread 1"
-		root=tk.Tk()
-		self.gui = Window(root,self)
-		root.mainloop()
+		while(1):
+			print "select option 1,2,3[create,join,chat]"
+			opt=int(raw_input())
+			if(opt==1):
+				print "Enter Group Id you wants to create"
+				gid=raw_input()
+				self.Send_message('join',gid)
+			elif(opt==2):
+				print "Enter Group Id you wants to join"
+				gid=raw_input()
+				self.Send_message('join',gid)
+			elif(opt==3):
+				print "Enter Group Id you wants to chat"
+				gid=raw_input()
+				print "Enter message"
+				msg=raw_input()
+				self.abcastSend(gid,msg)
+			elif(opt==5):
+				print "Enter Group Id you wants to leave"
+				gid=raw_input()
+				self.Send_message('leave',gid)
+			elif(opt==6): # logout
+				print "Enter Group Id you wants to join"
+				gid=raw_input()
+				self.Send_message('join',gid)	
+			elif(opt==4):
+				sys.exit(0)
 	
 	def Send_message(self,msg_text,gid,host=None,port=None,Client=False,isDeliverable=True,copyClock=None):
 		soc=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		if(Client):
 			soc.connect((host, port))
-			if(copyClock != None):
-				soc.sendall(str(message(msg_text,0,self.uid,gid,copyClock,isDeliverable)))
-			else:
-				soc.sendall(str(message(msg_text,0,self.uid,gid,self.clocks[gid],isDeliverable)))
+			soc.sendall(str(message(msg_text,0,self.uid,gid,self.clocks[gid],isDeliverable)))
 		else:
 			soc.connect((self.serverIp,self.serverPort))
 			soc.sendall(str(message(msg_text+'/'+self.clientIp+'/'+str(self.clientPort),1,self.uid,gid)))
 			# soc.sendall("^#"+str(self.uid)+'#'+str(gid)+'#'+msg_text+'/'+self.clientIp+'/'+str(self.clientPort))
 		soc.close()
+
+		if(copyClock != None):
+			soc.sendall(str(message(msg_text,0,self.uid,gid,copyClock,isDeliverable)))
+		else:
+			soc.sendall(str(message(msg_text,0,self.uid,gid,self.clocks[gid],isDeliverable)))
+                else:
+                        soc.connect((self.serverIp,self.serverPort))
+
+
 	def handle_server(self,msg): # ignore uid send by server
 		parsed=msg.text.split('/')
 		if(parsed[0]=="InformJoin"):
@@ -263,7 +167,7 @@ class Client(object): # for logout, login for the time assume no logout because 
 			for i in ip_id_list:
 				self.ClientId_IP[i.split(',')[0]]=(i.split(',')[1],int(i.split(',')[2]))
 				self.Grp_Info[msg.Group_id][i.split(',')[0]]=True
-		self.gui.disp_group()		
+
 	# msg : message type
 	def cbcastReceive(self,msg):
 		if(int(self.uid) == 1 and msg.isDeliverable == False):
@@ -282,16 +186,10 @@ class Client(object): # for logout, login for the time assume no logout because 
 			if delay_delivery == True:
 				self.delay_queue[msg.Group_id].append(msg)
 				self.delay_queue[msg.Group_id].sort(timestamp_compare)
-				print msg.text,' queued by ',msg.Client_id,msg.Group_id         
 			else:
 				# deliver(msg) and note the uid 
 				self.uidRecord.append(msg.Client_id)
 				print msg.text,' delivered by ',msg.Client_id,msg.Group_id
-				if(msg.Group_id in self.ChattingTable.keys()):
-					self.ChattingTable[msg.Group_id].append(msg.Client_id+" : "+msg.text)
-				else:
-					self.ChattingTable[msg.Group_id] = [msg.Client_id+" : "+msg.text]
-				self.gui.open_group(msg.Group_id)
 				if(int(msg.Client_id) != int(self.uid)):
 					clock.increment(int(msg.Client_id)-1)
 				for member in self.Grp_Info[msg.Group_id]:
@@ -309,31 +207,21 @@ class Client(object): # for logout, login for the time assume no logout because 
 			else:	
 				self.delay_queue[msg.Group_id].append(msg)
 			self.delay_queue[msg.Group_id].sort(self.timestamp_compare)
-			print msg.text,' queued by ',msg.Client_id,msg.Group_id
 			# print self.delay_queue[msg.Group_id][0].text
 			while(len(self.order_queue[msg.Group_id]) > 0):
 				clock = self.clocks[msg.Group_id]
 				x = self.order_queue[msg.Group_id][0]
-				status = 1
 				for mesg in self.delay_queue[msg.Group_id]:
-					if(int(mesg.Client_id) == int(x.Client_id)):
-						status = 0
+					if(mesg.Client_id == x.Client_id):
 						self.delay_queue[msg.Group_id].remove(mesg)
 						self.order_queue[msg.Group_id].remove(x)
 						# deliver(msg) 
 						print mesg.text,' delivered by ',mesg.Client_id,mesg.Group_id
-						if(msg.Group_id in self.ChattingTable.keys()):
-							self.ChattingTable[msg.Group_id].append(msg.Client_id+" : "+msg.text)
-						else:
-							self.ChattingTable[msg.Group_id] = [msg.Client_id+" : "+msg.text]						
-						self.gui.open_group(msg.Group_id)	
 						if(int(mesg.Client_id) != int(self.uid)):
 							clock.increment(int(mesg.Client_id)-1)
 						for member in self.Grp_Info[mesg.Group_id]:
 							clock.vector_clock[int(member)-1] = max(clock.vector_clock[int(member)-1],msg.clock.vector_clock[int(member)-1])
 						break
-				if(status == 1):
-					break
 		else:
 			delay_delivery = False
 			clock = self.clocks[msg.Group_id]
@@ -350,15 +238,9 @@ class Client(object): # for logout, login for the time assume no logout because 
 			if delay_delivery == True:
 				self.delay_queue[msg.Group_id].append(msg)
 				self.delay_queue[msg.Group_id].sort(self.timestamp_compare)
-				print msg.text,' queued by ',msg.Client_id,msg.Group_id
 			else:
 				# deliver(msg) 
 				print msg.text,' delivered by ',msg.Client_id,msg.Group_id
-				if(msg.Group_id in self.ChattingTable.keys()):
-					self.ChattingTable[msg.Group_id].append(msg.Client_id+" : "+msg.text)
-				else:
-					self.ChattingTable[msg.Group_id] = [msg.Client_id+" : "+msg.text]				
-				self.gui.open_group(msg.Group_id)
 				if(int(msg.Client_id) != int(self.uid)):
 					clock.increment(int(msg.Client_id)-1)
 				for member in self.Grp_Info[msg.Group_id]:
@@ -392,41 +274,18 @@ class Client(object): # for logout, login for the time assume no logout because 
 				self.order_queue[msg.Group_id] = [msg]
 			else:	
 				self.order_queue[msg.Group_id].append(msg)
-		else:
-			print "I am here no one to care"		
 
 
 	def RecvAndServe(self):
 		soc=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-		soc.setblocking(0)
 		soc.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 		soc.bind((self.clientIp,self.clientPort))
 		soc.listen(10)
 		print "client listing at ",str(self.clientPort)
-		# read_list = [soc]
-		# while True:
-		#     readable, writable, errored = select.select(read_list, [], [])
-		#     for s in readable:
-		#         if s is soc:
-		#             client_socket, address = soc`.accept()
-		#             read_list.append(client_socket)
-		#             print "Connection from", address
-		#         else:
-		#             data = s.recv(1024)
-		#             if data:
-		#                 s.send(data)
-		#             else:
-		#                 s.close()
-		#                 read_list.remove(s)	
-		while self.thread2:
-			try:
-				conn, addr = soc.accept()
-				print 'Connected with ' + addr[0] + ':' + str(addr[1])
-				self.handle(conn.recv(1024))
-			except:
-				pass
-				# print "looping"
-		print "server stopped"	
+		while True:
+			conn, addr = soc.accept()
+			print 'Connected with ' + addr[0] + ':' + str(addr[1])
+			self.handle(conn.recv(1024))
 
 	def ReadFromString(self,message_string):
 		msg=message_string.split('#')

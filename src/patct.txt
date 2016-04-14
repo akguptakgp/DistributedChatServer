@@ -1,0 +1,81 @@
+diff --git a/src/client.py b/src/client.py
+index 21bdfdf..43f2481 100644
+--- a/src/client.py
++++ b/src/client.py
+@@ -74,11 +74,9 @@ class Client(object): # for logout, login for the time assume no logout because
+ 
+ 	# msg : string
+ 	def cbcastSend_(self,gid,msg,isDeliverable=True):
+-		# increment the clock value once during a single bdcast
+ 		for i in self.Grp_Info[gid]:
+ 			if(int(i) != int(self.uid)):
+ 				self.Send_message(msg,gid,self.ClientId_IP[i][0],int(self.ClientId_IP[i][1]),True,isDeliverable)
+-			# time.sleep(5)
+ 
+ 	def abcastSend(self,gid,msg):
+ 		if(int(self.uid) == 1): # if it has token
+@@ -179,6 +177,7 @@ class Client(object): # for logout, login for the time assume no logout because
+ 			if delay_delivery == True:
+ 				self.delay_queue[msg.Group_id].append(msg)
+ 				self.delay_queue[msg.Group_id].sort(timestamp_compare)
++				print msg.text,' queued by ',msg.Client_id,msg.Group_id
+ 			else:
+ 				# deliver(msg) and note the uid 
+ 				self.uidRecord.append(msg.Client_id)
+@@ -204,12 +203,17 @@ class Client(object): # for logout, login for the time assume no logout because
+ 			else:	
+ 				self.delay_queue[msg.Group_id].append(msg)
+ 			self.delay_queue[msg.Group_id].sort(self.timestamp_compare)
++			print msg.text,' queued by ',msg.Client_id,msg.Group_id
+ 			# print self.delay_queue[msg.Group_id][0].text
+ 			while(len(self.order_queue[msg.Group_id]) > 0):
+ 				clock = self.clocks[msg.Group_id]
+ 				x = self.order_queue[msg.Group_id][0]
++				status = 1
+ 				for mesg in self.delay_queue[msg.Group_id]:
+-					if(mesg.Client_id == x.Client_id):
++					if(int(self.uid) == 2):
++						print mesg," ",type(mesg),mesg.Client_id,x.Client_id
++					if(int(mesg.Client_id) == int(x.Client_id)):
++						status = 0
+ 						self.delay_queue[msg.Group_id].remove(mesg)
+ 						self.order_queue[msg.Group_id].remove(x)
+ 						# deliver(msg) 
+@@ -224,6 +228,8 @@ class Client(object): # for logout, login for the time assume no logout because
+ 							clock.vector_clock[int(member)-1] = max(clock.vector_clock[int(member)-1],msg.clock.vector_clock[int(member)-1])
+ 						print "Current clock ",self.clocks[msg.Group_id].vector_clock
+ 						break
++				if(status == 1):
++					break
+ 		else:
+ 			delay_delivery = False
+ 			clock = self.clocks[msg.Group_id]
+@@ -240,6 +246,7 @@ class Client(object): # for logout, login for the time assume no logout because
+ 			if delay_delivery == True:
+ 				self.delay_queue[msg.Group_id].append(msg)
+ 				self.delay_queue[msg.Group_id].sort(self.timestamp_compare)
++				print msg.text,' queued by ',msg.Client_id,msg.Group_id
+ 			else:
+ 				# deliver(msg) 
+ 				print msg.text,' delivered by ',msg.Client_id,msg.Group_id
+@@ -278,8 +285,12 @@ class Client(object): # for logout, login for the time assume no logout because
+ 			# print len(self.order_queue)
+ 			if(len(self.order_queue) == 0):
+ 				self.order_queue[msg.Group_id] = [msg]
++				# print "Hey Gurudev help from here"
+ 			else:	
+ 				self.order_queue[msg.Group_id].append(msg)
++		else:
++			print "I am here no one to care"
++		# print "Out of block"
+ 
+ 
+ 	def RecvAndServe(self):
+@@ -289,6 +300,7 @@ class Client(object): # for logout, login for the time assume no logout because
+ 		soc.listen(10)
+ 		print "client listing at ",str(self.clientPort)
+ 		while True:
++			print "Still Listening ..."
+ 			conn, addr = soc.accept()
+ 			print 'Connected with ' + addr[0] + ':' + str(addr[1])
+ 			self.handle(conn.recv(1024))
