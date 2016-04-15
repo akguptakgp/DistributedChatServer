@@ -10,6 +10,9 @@ import Tkinter as tk
 import select
 import copy
 import MySQLdb
+import socket
+import fcntl
+import struct
 
 class VectorClock(object):
 	def __init__(self,string=None):
@@ -163,7 +166,8 @@ class Client(object): # for logout, login for the time assume no logout because 
 			sys.exit(0)
 		self.uid=sys.argv[2]
 		self.clocks={}	 # map of gid to VectorClock
-		self.serverIp='localhost'
+		# self.serverIp=self.get_ip_address('eth0')
+		self.serverIp="10.5.16.223"
 		self.serverPort=50089+int(sys.argv[1])
 		self.clientPort=random.randint(10000,60000)
 		self.ClientId_IP={}
@@ -173,7 +177,8 @@ class Client(object): # for logout, login for the time assume no logout because 
 		self.delay_queue={}	 # map of gid to list of delayed messages
 		self.order_queue={}	 # map of gid to list of delayed messages
 		self.uidRecord = []
-		self.clientIp='localhost'
+		# self.clientIp='0.0.0.0'
+		self.clientIp=self.get_ip_address('eth0')
 		# Create two threads as follows
 		self.thread1=True
 		self.gui=None
@@ -181,11 +186,21 @@ class Client(object): # for logout, login for the time assume no logout because 
 		cursor = self.db.cursor()
 		sql="SELECT VERSION();"
 		cursor.execute(sql)
+		print self.get_ip_address('eth0')  # '192.168.0.110'
 
 		print cursor.fetchall()
 		Thread(target=self.execute, args=()).start()
 		self.thread2=True
 		Thread(target=self.RecvAndServe, args=()).start()	
+
+
+	def get_ip_address(self,ifname):
+	    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+	    return socket.inet_ntoa(fcntl.ioctl(
+	        s.fileno(),
+	        0x8915,  # SIOCGIFADDR
+	        struct.pack('256s', ifname[:15])
+	    )[20:24])
 	def RepresentsInt(self,s):
 	    try: 
 	        int(s)
@@ -357,6 +372,8 @@ class Client(object): # for logout, login for the time assume no logout because 
 		if(int(self.uid) == 1 and msg.isDeliverable == False):
 			delay_delivery = False
 			clock = self.clocks[msg.Group_id]
+			if(int(msg.Client_id) == 3):
+				print self.clocks[msg.Group_id].vector_clock
 			if(int(msg.Client_id) != int(self.uid)):
 				if(clock.vector_clock[int(msg.Client_id) - 1] != msg.clock.vector_clock[int(msg.Client_id) - 1] - 1):
 					delay_delivery = True

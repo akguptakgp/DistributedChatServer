@@ -1,5 +1,7 @@
 import socket
 import sys
+import fcntl
+import struct
 
 class message(object):
 	def __init__(self,msg,msg_type,Client_id,Group_id,time_stamp=None):
@@ -18,12 +20,18 @@ class message(object):
 class Server(object):
 	def __init__(self):
 		self.socket=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-		self.serverIp='localhost'
+		self.serverIp=self.get_ip_address('eth0')
 		self.serverPort=50089+int(sys.argv[1])
 		self.ClientId_IP={}   # int key
 		self.Grp_Info={}      # int key
 		self.execute()
-
+	def get_ip_address(self,ifname):
+	    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+	    return socket.inet_ntoa(fcntl.ioctl(
+	        s.fileno(),
+	        0x8915,  # SIOCGIFADDR
+	        struct.pack('256s', ifname[:15])
+	    )[20:24])	
 	def execute(self):
 		self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 		self.socket.bind((self.serverIp,self.serverPort))
