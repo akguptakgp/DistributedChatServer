@@ -1,0 +1,116 @@
+diff --git a/src/client.py b/src/client.py
+index 3f6312e..814a1b4 100644
+--- a/src/client.py
++++ b/src/client.py
+@@ -304,14 +304,24 @@ class Client(object): # for logout, login for the time assume no logout because
+ 		elif(int(self.uid) != 1 and msg.isDeliverable == False):
+ 			# print "I am here ",msg.Group_id
+ 			# print self.delay_queue
+-			if(len(self.delay_queue) == 0):
++			# if(int(self.uid) == 2):
++				# print msg.Client_id,"  jai guru"
++				# print self.delay_queue.keys()
++			# print "Jai jai radhe"
++			# if(len(self.delay_queue) == 0):
++			if(msg.Group_id not in self.delay_queue.keys()):
+ 				self.delay_queue[msg.Group_id] = [msg]
++				# if(int(self.uid) == 2):
++					# print "Jai radherani"
+ 			else:	
+ 				self.delay_queue[msg.Group_id].append(msg)
++				# if(int(self.uid) == 2):
++					# print "Jai radhe"
+ 			self.delay_queue[msg.Group_id].sort(self.timestamp_compare)
++			print self.delay_queue
+ 			print msg.text,' queued by ',msg.Client_id,msg.Group_id
+ 			# print self.delay_queue[msg.Group_id][0].text
+-			while(len(self.order_queue[msg.Group_id]) > 0):
++			while(msg.Group_id in self.order_queue.keys() and len(self.order_queue[msg.Group_id]) > 0):
+ 				clock = self.clocks[msg.Group_id]
+ 				x = self.order_queue[msg.Group_id][0]
+ 				status = 1
+@@ -388,10 +398,37 @@ class Client(object): # for logout, login for the time assume no logout because
+ 			# print "Hey Gurudev help from here"
+ 			# Order the msgs in the Cbcast queue according to the order in the msg
+ 			# print len(self.order_queue)
+-			if(len(self.order_queue) == 0):
++			if(msg.Group_id not in self.order_queue):
+ 				self.order_queue[msg.Group_id] = [msg]
++				print "Hey Gurudev help from here"
+ 			else:	
+ 				self.order_queue[msg.Group_id].append(msg)
++			status = 0
++			while(msg.Group_id in self.order_queue.keys() and len(self.order_queue[msg.Group_id]) > 0):
++				clock = self.clocks[msg.Group_id]
++				x = self.order_queue[msg.Group_id][0]
++				status = 1
++				if(msg.Group_id not in self.delay_queue):
++					break
++				for mesg in self.delay_queue[msg.Group_id]:
++					if(int(mesg.Client_id) == int(x.Client_id)):
++						status = 0
++						self.delay_queue[mesg.Group_id].remove(mesg)
++						self.order_queue[mesg.Group_id].remove(x)
++						# deliver(msg) 
++						print mesg.text,' delivered by ',mesg.Client_id,mesg.Group_id
++						if(mesg.Group_id in self.ChattingTable.keys()):
++							self.ChattingTable[msg.Group_id].append(mesg.Client_id+" : "+mesg.text)
++						else:
++							self.ChattingTable[mesg.Group_id] = [mesg.Client_id+" : "+mesg.text]						
++						self.gui.open_group(mesg.Group_id)	
++						if(int(mesg.Client_id) != int(self.uid)):
++							clock.increment(int(mesg.Client_id)-1)
++						for member in self.Grp_Info[mesg.Group_id]:
++							clock.vector_clock[int(member)-1] = max(clock.vector_clock[int(member)-1],mesg.clock.vector_clock[int(member)-1])
++						break
++				if(status == 1):
++					break
+ 		else:
+ 			print "I am here no one to care"		
+ 
+@@ -403,27 +440,13 @@ class Client(object): # for logout, login for the time assume no logout because
+ 		soc.bind((self.clientIp,self.clientPort))
+ 		soc.listen(10)
+ 		print "client listing at ",str(self.clientPort)
+-		# read_list = [soc]
+-		# while True:
+-		#     readable, writable, errored = select.select(read_list, [], [])
+-		#     for s in readable:
+-		#         if s is soc:
+-		#             client_socket, address = soc`.accept()
+-		#             read_list.append(client_socket)
+-		#             print "Connection from", address
+-		#         else:
+-		#             data = s.recv(1024)
+-		#             if data:
+-		#                 s.send(data)
+-		#             else:
+-		#                 s.close()
+-		#                 read_list.remove(s)	
+ 		while self.thread2:
+ 			try:
++				# print "Still Listening ..."
+ 				conn, addr = soc.accept()
+ 				print 'Connected with ' + addr[0] + ':' + str(addr[1])
+ 				self.handle(conn.recv(1024))
+-			except:
++			except socket.error:
+ 				pass
+ 				# print "looping"
+ 		print "server stopped"	
+@@ -445,11 +468,11 @@ class Client(object): # for logout, login for the time assume no logout because
+ 	
+ 	# assuming the active members in both the timestamps are same
+ 	# vectorClock : list
+-	def timestamp_compare(msg1,msg2):
+-		vectorClock1 = msg1.clock
+-		vectorClock2 = msg2.clock
++	def timestamp_compare(self,msg1,msg2):
++		vectorClock1 = msg1.clock.vector_clock
++		vectorClock2 = msg2.clock.vector_clock
+ 		ans = True # assuming vectorClock1 > vectorClock2
+-		for i in vectorClock1.Max_Clients:
++		for i in range(msg1.clock.Max_Clients):
+ 			if(vectorClock1[i] < vectorClock2[i]):
+ 				ans = False
+ 				break

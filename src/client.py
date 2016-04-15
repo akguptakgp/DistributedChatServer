@@ -10,6 +10,42 @@ import Tkinter as tk
 import select
 import copy
 
+class VectorClock(object):
+	def __init__(self,string=None):
+		if(string==None):
+			self.Max_Clients=5
+			self.vector_clock=[0 for i in range(self.Max_Clients)]
+		else:
+			string=string.split(',')
+			self.Max_Clients=len(string)
+			self.vector_clock=[0 for i in range(self.Max_Clients)]
+			for i in range(self.Max_Clients):
+				self.vector_clock[i]=int(string[i])
+	def __str__(self):
+		return ",".join(str(self.vector_clock[i]) for i in range(self.Max_Clients))	
+	def increment(self,nodeId):
+		self.vector_clock[nodeId]+=1
+	
+	def merge(self,b): # pass b as string
+		b=b.split(',')
+		for i in range(self.Max_Clients):
+			self.vector_clock[i]=max(self.vector_clock[i],int(b[i]))
+
+class message(object):
+	def __init__(self,msg,msg_type,Client_id,Group_id,time_stamp=None,isDeliverable=True):
+		self.Client_id=Client_id         # a string value
+		self.Group_id=Group_id			 # a string value
+		self.clock=time_stamp			 # a VectorClock value
+		self.text=msg                    # string
+		self.msg_type=msg_type           # 0 or 1
+		self.isDeliverable = isDeliverable
+	
+	def __str__(self):
+		if(self.msg_type==0):
+			return "@#"+str(self.Client_id)+"#"+str(self.Group_id)+"#"+str(self.text)+"#"+str(self.clock)+"#"+str(self.isDeliverable) # client-client type
+		else:
+			return "^#"+str(self.Client_id)+"#"+str(self.Group_id)+"#"+str(self.text)
+
 
 class Window(tk.Frame):
 	def __init__(self,parent,client_object):
@@ -57,6 +93,8 @@ class Window(tk.Frame):
 		self.text_show.insert(tk.END,data+'\n')
 
 	def open_group(self,custom_selection=None):
+		time.sleep(3)
+		print "ChattingTable called with grp id",custom_selection
 		tr=self.Group_list.curselection()
 		if(custom_selection==None):
 			if(len(tr)==0):
@@ -100,43 +138,6 @@ class Window(tk.Frame):
 				to_insert+=el+','
 			self.Group_list.insert(tk.END,to_insert[:-1])	
 
-
-class VectorClock(object):
-	def __init__(self,string=None):
-		if(string==None):
-			self.Max_Clients=5
-			self.vector_clock=[0 for i in range(self.Max_Clients)]
-		else:
-			string=string.split(',')
-			self.Max_Clients=len(string)
-			self.vector_clock=[0 for i in range(self.Max_Clients)]
-			for i in range(self.Max_Clients):
-				self.vector_clock[i]=int(string[i])
-	def __str__(self):
-		return ",".join(str(self.vector_clock[i]) for i in range(self.Max_Clients))	
-	def increment(self,nodeId):
-		self.vector_clock[nodeId]+=1
-	
-	def merge(self,b): # pass b as string
-		b=b.split(',')
-		for i in range(self.Max_Clients):
-			self.vector_clock[i]=max(self.vector_clock[i],int(b[i]))
-
-class message(object):
-	def __init__(self,msg,msg_type,Client_id,Group_id,time_stamp=None,isDeliverable=True):
-		self.Client_id=Client_id         # a string value
-		self.Group_id=Group_id			 # a string value
-		self.clock=time_stamp			 # a VectorClock value
-		self.text=msg                    # string
-		self.msg_type=msg_type           # 0 or 1
-		self.isDeliverable = isDeliverable
-	
-	def __str__(self):
-		if(self.msg_type==0):
-			return "@#"+str(self.Client_id)+"#"+str(self.Group_id)+"#"+str(self.text)+"#"+str(self.clock)+"#"+str(self.isDeliverable) # client-client type
-		else:
-			return "^#"+str(self.Client_id)+"#"+str(self.Group_id)+"#"+str(self.text)
-
 class Client(object): # for logout, login for the time assume no logout because we need to store on disk 
 	def __init__(self):
 		print "Please Enter your user ID"
@@ -168,7 +169,7 @@ class Client(object): # for logout, login for the time assume no logout because 
 		for i in self.Grp_Info[gid]:
 			# if(i!=self.uid):
 			self.Send_message(msg,gid,self.ClientId_IP[i][0],int(self.ClientId_IP[i][1]),True,isDeliverable,copyClock)
-			time.sleep(5)
+			time.sleep(2)
 
 	# msg : string
 	def cbcastSend_(self,gid,msg,isDeliverable=True):
@@ -304,14 +305,15 @@ class Client(object): # for logout, login for the time assume no logout because 
 		elif(int(self.uid) != 1 and msg.isDeliverable == False):
 			# print "I am here ",msg.Group_id
 			# print self.delay_queue
-			if(len(self.delay_queue) == 0):
+			if(msg.Group_id not in self.delay_queue.keys()):
 				self.delay_queue[msg.Group_id] = [msg]
 			else:	
 				self.delay_queue[msg.Group_id].append(msg)
 			self.delay_queue[msg.Group_id].sort(self.timestamp_compare)
+			print self.delay_queue
 			print msg.text,' queued by ',msg.Client_id,msg.Group_id
 			# print self.delay_queue[msg.Group_id][0].text
-			while(len(self.order_queue[msg.Group_id]) > 0):
+			while(msg.Group_id in self.order_queue.keys() and len(self.order_queue[msg.Group_id]) > 0):
 				clock = self.clocks[msg.Group_id]
 				x = self.order_queue[msg.Group_id][0]
 				status = 1
@@ -388,10 +390,35 @@ class Client(object): # for logout, login for the time assume no logout because 
 			# print "Hey Gurudev help from here"
 			# Order the msgs in the Cbcast queue according to the order in the msg
 			# print len(self.order_queue)
-			if(len(self.order_queue) == 0):
+			if(msg.Group_id not in self.order_queue):
 				self.order_queue[msg.Group_id] = [msg]
 			else:	
 				self.order_queue[msg.Group_id].append(msg)
+			status = 0
+			while(msg.Group_id in self.order_queue.keys() and len(self.order_queue[msg.Group_id]) > 0):
+				clock = self.clocks[msg.Group_id]
+				x = self.order_queue[msg.Group_id][0]
+				status = 1
+				if(msg.Group_id not in self.delay_queue):
+					break
+				for mesg in self.delay_queue[msg.Group_id]:
+					if(int(mesg.Client_id) == int(x.Client_id)):
+						status = 0
+						self.delay_queue[mesg.Group_id].remove(mesg)
+						self.order_queue[mesg.Group_id].remove(x)
+						print mesg.text,' delivered by ',mesg.Client_id,mesg.Group_id
+						if(mesg.Group_id in self.ChattingTable.keys()):
+							self.ChattingTable[msg.Group_id].append(mesg.Client_id+" : "+mesg.text)
+						else:
+							self.ChattingTable[mesg.Group_id] = [mesg.Client_id+" : "+mesg.text]
+						self.gui.open_group(mesg.Group_id)
+						if(int(mesg.Client_id) != int(self.uid)):
+							clock.increment(int(mesg.Client_id)-1)
+						for member in self.Grp_Info[mesg.Group_id]:
+							clock.vector_clock[int(member)-1] = max(clock.vector_clock[int(member)-1],mesg.clock.vector_clock[int(member)-1])
+						break
+				if(status == 1):
+					break
 		else:
 			print "I am here no one to care"		
 
@@ -403,27 +430,13 @@ class Client(object): # for logout, login for the time assume no logout because 
 		soc.bind((self.clientIp,self.clientPort))
 		soc.listen(10)
 		print "client listing at ",str(self.clientPort)
-		# read_list = [soc]
-		# while True:
-		#     readable, writable, errored = select.select(read_list, [], [])
-		#     for s in readable:
-		#         if s is soc:
-		#             client_socket, address = soc`.accept()
-		#             read_list.append(client_socket)
-		#             print "Connection from", address
-		#         else:
-		#             data = s.recv(1024)
-		#             if data:
-		#                 s.send(data)
-		#             else:
-		#                 s.close()
-		#                 read_list.remove(s)	
 		while self.thread2:
 			try:
+				# print "connect"
 				conn, addr = soc.accept()
 				print 'Connected with ' + addr[0] + ':' + str(addr[1])
 				self.handle(conn.recv(1024))
-			except:
+			except socket.error:
 				pass
 				# print "looping"
 		print "server stopped"	
@@ -445,18 +458,15 @@ class Client(object): # for logout, login for the time assume no logout because 
 	
 	# assuming the active members in both the timestamps are same
 	# vectorClock : list
-	def timestamp_compare(msg1,msg2):
-		vectorClock1 = msg1.clock
-		vectorClock2 = msg2.clock
+	def timestamp_compare(self,msg1,msg2):
+		vectorClock1 = msg1.clock.vector_clock
+		vectorClock2 = msg2.clock.vector_clock
 		ans = True # assuming vectorClock1 > vectorClock2
-		for i in vectorClock1.Max_Clients:
+		for i in range(msg1.clock.Max_Clients):
 			if(vectorClock1[i] < vectorClock2[i]):
 				ans = False
 				break
 		return ans
-
-
-			
 
 if __name__=='__main__':
 	random.seed(datetime.now())
