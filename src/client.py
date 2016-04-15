@@ -9,6 +9,7 @@ import tkMessageBox
 import Tkinter as tk
 import select
 import copy
+import MySQLdb
 
 class VectorClock(object):
 	def __init__(self,string=None):
@@ -140,8 +141,27 @@ class Window(tk.Frame):
 
 class Client(object): # for logout, login for the time assume no logout because we need to store on disk 
 	def __init__(self):
-		print "Please Enter your user ID"
-		self.uid=raw_input()
+		if(len(sys.argv)<4):
+			print " usage: python client.py serverportoffest clientID option"
+			sys.exit(0)
+		if(not self.RepresentsInt(sys.argv[2])):
+			print "User ID must be an integer"
+			sys.exit(0)
+		if(not self.RepresentsInt(sys.argv[1])):
+			print "serverportoffest must be an integer"
+			sys.exit(0)
+		if(self.RepresentsInt(sys.argv[3])):
+			if(int(sys.argv[3])!=0 and int(sys.argv[3])!=1):
+				print "only two values allowed 0-new client, 1- old client"
+				sys.exit(0)
+			elif(int(sys.argv[3])==0):
+				print "new client"
+			elif(int(sys.argv[3])==1):
+				print "old Client"	
+		else:
+			print "only two values allowed 0-new client, 1- old client"
+			sys.exit(0)
+		self.uid=sys.argv[2]
 		self.clocks={}	 # map of gid to VectorClock
 		self.serverIp='localhost'
 		self.serverPort=50089+int(sys.argv[1])
@@ -157,11 +177,59 @@ class Client(object): # for logout, login for the time assume no logout because 
 		# Create two threads as follows
 		self.thread1=True
 		self.gui=None
+		self.db=MySQLdb.connect("10.5.18.68","12CS10006","btech12","12CS10006")
+		cursor = self.db.cursor()
+		sql="SELECT VERSION();"
+		cursor.execute(sql)
+
+		print cursor.fetchall()
 		Thread(target=self.execute, args=()).start()
 		self.thread2=True
 		Thread(target=self.RecvAndServe, args=()).start()	
-
+	def RepresentsInt(self,s):
+	    try: 
+	        int(s)
+	        return True
+	    except ValueError:
+	        return False
 	# msg : string
+	def empty_delay_queue(self,msg):
+		while(1):
+			check = 0
+			delay_delivery = False
+			while(msg.text != None and msg.Group_id in self.delay_queue and len(self.delay_queue[msg.Group_id]) > 0 and self.delay_queue[msg.Group_id][0].isDeliverable == False):
+				clock = self.clocks[msg.Group_id]
+				if(int(msg.Client_id) != int(self.uid)):
+					if(clock.vector_clock[int(msg.Client_id) - 1] != msg.clock.vector_clock[int(msg.Client_id) - 1] - 1):
+						delay_delivery = True
+					else:
+						for member in self.Grp_Info[msg.Group_id]:
+							if(self.Grp_Info[msg.Group_id][member] == True and int(member) != int(msg.Client_id) and clock.vector_clock[int(member) - 1] < msg.clock.vector_clock[int(member) - 1]):
+								delay_delivery = True
+								break
+				if(delay_delivery == True):
+					break
+				else:
+					check += 1
+					x = self.delay_queue[msg.Group_id].pop(0)
+					print x.text,' delivered by ',x.Client_id,x.Group_id
+					if(x.Group_id in self.ChattingTable.keys()):
+						self.ChattingTable[x.Group_id].append(x.Client_id+" : "+x.text)
+					else:
+						self.ChattingTable[x.Group_id] = [x.Client_id+" : "+x.text]
+					self.gui.open_group(x.Group_id)
+
+			while(msg.Group_id in self.delay_queue and len(self.delay_queue[msg.Group_id]) > 0 and self.delay_queue[msg.Group_id][0].isDeliverable == True):
+				check += 1
+				x = self.delay_queue[msg.Group_id].pop(0)
+				print x.text,' delivered by ',x.Client_id,x.Group_id
+				if(x.Group_id in self.ChattingTable.keys()):
+					self.ChattingTable[x.Group_id].append(x.Client_id+" : "+x.text)
+				else:
+					self.ChattingTable[x.Group_id] = [x.Client_id+" : "+x.text]
+				self.gui.open_group(x.Group_id)
+			if(check == 0):
+				break
 	def cbcastSend(self,gid,msg,isDeliverable=True):
 		# increment the clock value once during a single bdcast
 		self.clocks[gid].increment(int(self.uid)-1) # assume node id to be self.uid-1
@@ -190,23 +258,42 @@ class Client(object): # for logout, login for the time assume no logout because 
 		print type(opt)
 		if(opt==1):
 			gid=textr.get("1.0",'end-1c')
+			if(not self.RepresentsInt(gid)):
+				tkMessageBox.showinfo("Error", "Enter a valid group ID")
+				textr.delete("1.0",tk.END)
+				return
 			print "joinig Group Id ",gid
 			self.Send_message('join',gid)
 		elif(opt==2):
 			gid=textr.get("1.0",'end-1c')
+			if(not self.RepresentsInt(gid)):
+				tkMessageBox.showinfo("Error", "Enter a valid group ID")
+				textr.delete("1.0",tk.END)
+				return
 			print "joinig Group Id ",gid
 			self.Send_message('join',gid)
 		elif(opt==3):
 			tr=self.gui.Group_list.curselection()
 			if(len(tr)==0):
 				print "Please select some group"
+				textr.delete("1.0",tk.END)
+				tkMessageBox.showinfo("Error", "Select a group before sending a message")
 				return
 			gid=self.gui.display_list[tr[0]][6:7]
 			msg=textr.get("1.0",'end-1c')
+			if(len(msg)==0):
+				print "Please enter a valid message.."
+				#textr.delete("1.0",tk.END)
+				tkMessageBox.showinfo("Error", "Enter a valid message")
+				return
 			print "send message ",msg," to ",gid
-			self.abcastSend(gid,msg)
+			self.abcastSend(gid,msg)	
 		elif(opt==4):
 			gid=textr.get("1.0",'end-1c')
+			if(not self.RepresentsInt(gid)):
+				tkMessageBox.showinfo("Error", "Enter a valid group ID")
+				textr.delete("1.0",tk.END)
+				return
 			print "leaving Group Id ",gid
 			self.Send_message('leave',gid)
 		elif(opt==5): # logout
@@ -280,7 +367,7 @@ class Client(object): # for logout, login for the time assume no logout because 
 							delay_delivery = True
 							print "Cond 2 failed"
 							break
-			if delay_delivery == True:
+			if(delay_delivery == True or (msg.Group_id in self.delay_queue.keys() and len(self.delay_queue[msg.Group_id]) > 0)):
 				self.delay_queue[msg.Group_id].append(msg)
 				self.delay_queue[msg.Group_id].sort(timestamp_compare)
 				print msg.text,' queued by ',msg.Client_id,msg.Group_id         
@@ -349,7 +436,7 @@ class Client(object): # for logout, login for the time assume no logout because 
 							delay_delivery = True
 							print "Cond 2 failed"
 							break
-			if delay_delivery == True:
+			if(delay_delivery == True or (msg.Group_id in self.delay_queue.keys() and len(self.delay_queue[msg.Group_id]) > 0)):
 				self.delay_queue[msg.Group_id].append(msg)
 				self.delay_queue[msg.Group_id].sort(self.timestamp_compare)
 				print msg.text,' queued by ',msg.Client_id,msg.Group_id
@@ -385,11 +472,14 @@ class Client(object): # for logout, login for the time assume no logout because 
 		if(msg.msg_type==1):
 			self.handle_server(msg)
 		elif(msg.msg_type==0):
+			self.empty_delay_queue(msg)
 			self.handle_client(msg)
+			self.empty_delay_queue(msg)
 		elif(msg.msg_type==-1):
 			# print "Hey Gurudev help from here"
 			# Order the msgs in the Cbcast queue according to the order in the msg
 			# print len(self.order_queue)
+			self.empty_delay_queue(msg)
 			if(msg.Group_id not in self.order_queue):
 				self.order_queue[msg.Group_id] = [msg]
 			else:	
@@ -417,6 +507,7 @@ class Client(object): # for logout, login for the time assume no logout because 
 						for member in self.Grp_Info[mesg.Group_id]:
 							clock.vector_clock[int(member)-1] = max(clock.vector_clock[int(member)-1],mesg.clock.vector_clock[int(member)-1])
 						break
+				self.empty_delay_queue(msg)
 				if(status == 1):
 					break
 		else:

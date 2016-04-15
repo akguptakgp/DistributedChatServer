@@ -1,0 +1,98 @@
+diff --git a/src/client.py b/src/client.py
+index fc8eefe..18ba969 100644
+--- a/src/client.py
++++ b/src/client.py
+@@ -161,6 +161,44 @@ class Client(object): # for logout, login for the time assume no logout because
+ 		self.thread2=True
+ 		Thread(target=self.RecvAndServe, args=()).start()	
+ 
++	def empty_delay_queue(self,msg):
++		while(1):
++			check = 0
++			delay_delivery = False
++			while(msg.text != None and msg.Group_id in self.delay_queue and len(self.delay_queue[msg.Group_id]) > 0 and self.delay_queue[msg.Group_id][0].isDeliverable == False):
++				clock = self.clocks[msg.Group_id]
++				if(int(msg.Client_id) != int(self.uid)):
++					if(clock.vector_clock[int(msg.Client_id) - 1] != msg.clock.vector_clock[int(msg.Client_id) - 1] - 1):
++						delay_delivery = True
++					else:
++						for member in self.Grp_Info[msg.Group_id]:
++							if(self.Grp_Info[msg.Group_id][member] == True and int(member) != int(msg.Client_id) and clock.vector_clock[int(member) - 1] < msg.clock.vector_clock[int(member) - 1]):
++								delay_delivery = True
++								break
++				if(delay_delivery == True):
++					break
++				else:
++					check += 1
++					x = self.delay_queue[msg.Group_id].pop(0)
++					print x.text,' delivered by ',x.Client_id,x.Group_id
++					if(x.Group_id in self.ChattingTable.keys()):
++						self.ChattingTable[x.Group_id].append(x.Client_id+" : "+x.text)
++					else:
++						self.ChattingTable[x.Group_id] = [x.Client_id+" : "+x.text]
++					self.gui.open_group(x.Group_id)
++
++			while(msg.Group_id in self.delay_queue and len(self.delay_queue[msg.Group_id]) > 0 and self.delay_queue[msg.Group_id][0].isDeliverable == True):
++				check += 1
++				x = self.delay_queue[msg.Group_id].pop(0)
++				print x.text,' delivered by ',x.Client_id,x.Group_id
++				if(x.Group_id in self.ChattingTable.keys()):
++					self.ChattingTable[x.Group_id].append(x.Client_id+" : "+x.text)
++				else:
++					self.ChattingTable[x.Group_id] = [x.Client_id+" : "+x.text]
++				self.gui.open_group(x.Group_id)
++			if(check == 0):
++				break
++
+ 	# msg : string
+ 	def cbcastSend(self,gid,msg,isDeliverable=True):
+ 		# increment the clock value once during a single bdcast
+@@ -280,7 +318,7 @@ class Client(object): # for logout, login for the time assume no logout because
+ 							delay_delivery = True
+ 							print "Cond 2 failed"
+ 							break
+-			if delay_delivery == True:
++			if(delay_delivery == True or (msg.Group_id in self.delay_queue.keys() and len(self.delay_queue[msg.Group_id]) > 0)):
+ 				self.delay_queue[msg.Group_id].append(msg)
+ 				self.delay_queue[msg.Group_id].sort(timestamp_compare)
+ 				print msg.text,' queued by ',msg.Client_id,msg.Group_id         
+@@ -349,11 +387,13 @@ class Client(object): # for logout, login for the time assume no logout because
+ 							delay_delivery = True
+ 							print "Cond 2 failed"
+ 							break
+-			if delay_delivery == True:
++			# if not allowed to deliver or msgs are already present in delay_queue 
++			if(delay_delivery == True or (msg.Group_id in self.delay_queue.keys() and len(self.delay_queue[msg.Group_id]) > 0)):
+ 				self.delay_queue[msg.Group_id].append(msg)
+ 				self.delay_queue[msg.Group_id].sort(self.timestamp_compare)
+ 				print msg.text,' queued by ',msg.Client_id,msg.Group_id
+ 			else:
++				# if allowed to deliver and no msgs in delay_queue
+ 				# deliver(msg) 
+ 				print msg.text,' delivered by ',msg.Client_id,msg.Group_id
+ 				if(msg.Group_id in self.ChattingTable.keys()):
+@@ -385,11 +425,14 @@ class Client(object): # for logout, login for the time assume no logout because
+ 		if(msg.msg_type==1):
+ 			self.handle_server(msg)
+ 		elif(msg.msg_type==0):
++			self.empty_delay_queue(msg)
+ 			self.handle_client(msg)
++			self.empty_delay_queue(msg)
+ 		elif(msg.msg_type==-1):
+ 			# print "Hey Gurudev help from here"
+ 			# Order the msgs in the Cbcast queue according to the order in the msg
+ 			# print len(self.order_queue)
++			self.empty_delay_queue(msg)
+ 			if(msg.Group_id not in self.order_queue):
+ 				self.order_queue[msg.Group_id] = [msg]
+ 			else:	
+@@ -417,6 +460,9 @@ class Client(object): # for logout, login for the time assume no logout because
+ 						for member in self.Grp_Info[mesg.Group_id]:
+ 							clock.vector_clock[int(member)-1] = max(clock.vector_clock[int(member)-1],mesg.clock.vector_clock[int(member)-1])
+ 						break
++				self.empty_delay_queue(msg)
++				
++
+ 				if(status == 1):
+ 					break
+ 		else:
