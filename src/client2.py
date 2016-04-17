@@ -9,7 +9,7 @@ import tkMessageBox
 import Tkinter as tk
 import select
 import copy
-# import MySQLdb
+import MySQLdb
 import socket
 import fcntl
 import struct
@@ -50,11 +50,13 @@ class message(object):
 		else:
 			return "^#"+str(self.Client_id)+"#"+str(self.Group_id)+"#"+str(self.text)
 
+    
 
 class Window(tk.Frame):
 	def __init__(self,parent,client_object):
 		tk.Frame.__init__(self, parent)
 		self.root=parent
+		#self.root=title("Chat Interface")
 		self.selected_gid=1
 		self.frame1=tk.Frame(parent)
 		self.frame1.pack(side=tk.TOP)
@@ -74,7 +76,7 @@ class Window(tk.Frame):
 		self.opp=tk.Button(self.frame1,text="Open Chat",command=partial(self.open_group))
 		self.opp.pack(pady=30)
 
-		self.logout=tk.Button(self.frame1,text="Quit",command=partial(client_object.action,5))
+		self.logout=tk.Button(self.frame1,text="Out",command=partial(client_object.action,5))
 		self.logout.pack(side=tk.BOTTOM)
 		self.out=tk.Button(self.frame1,text="Logout",command=self.log_out)
 		self.out.pack(side=tk.BOTTOM,pady=5)		
@@ -88,7 +90,8 @@ class Window(tk.Frame):
 		self.leave.pack(side=tk.BOTTOM)
 		self.save_client=client_object
 		self.display_list=[]
-		self.last_gid=None
+
+
 
 	def fetch_data(self):
 		return self.text_type.get()
@@ -101,7 +104,6 @@ class Window(tk.Frame):
 		self.text_show.insert(tk.END,data+'\n')
 
 	def open_group(self,custom_selection=None):
-		print self.save_client.status
 		time.sleep(3)
 		print "ChattingTable called with grp id",custom_selection
 		tr=self.Group_list.curselection()
@@ -116,41 +118,27 @@ class Window(tk.Frame):
 			print self.save_client.Grp_Info[self.display_list[custom_selection][6:7]]
 			gid=self.display_list[custom_selection][6:7]
 			self.selected_gid=gid
-			self.last_gid=gid
 			self.text_show.delete("1.0",tk.END)
 			if gid not in self.save_client.ChattingTable:
 				return
 			self.text_show.insert(tk.END, "chatting history of group:"+gid+'\n')
-			for j in range(len(self.save_client.ChattingTable[gid])):
-				i=self.save_client.ChattingTable[gid][j]
+			for i in self.save_client.ChattingTable[gid]:
 				print i
-				self.text_show.insert(tk.END, i[0]+':'+str(i[1])+'\n')
-				# print i[1]=="False",i[1]
-				if( not i[1]):
-					self.save_client.ChattingTable[gid][j]=(i[0],self.save_client.status)
-					print "changed"
-				print self.save_client.ChattingTable[gid][j]
+				self.text_show.insert(tk.END, i+'\n')
 			return	
+
 		print self.display_list[tr[0]][6:7]
 		print self.save_client.Grp_Info[self.display_list[tr[0]][6:7]]
 		gid=self.display_list[tr[0]][6:7]
-		self.last_gid=gid
 		self.selected_gid=gid
 		self.text_show.delete("1.0",tk.END)
 		if gid not in self.save_client.ChattingTable:
 			return
 		self.text_show.insert(tk.END, "chatting history of group:"+gid+'\n')
-		for j in range(len(self.save_client.ChattingTable[gid])):
-			i=self.save_client.ChattingTable[gid][j]
+		for i in self.save_client.ChattingTable[gid]:
 			print i
-			self.text_show.insert(tk.END, i[0]+':'+str(i[1])+'\n')
-			# print i[1]=="False",i[1]
-			if(not i[1]):
-				self.save_client.ChattingTable[gid][j]=(i[0],self.save_client.status)
-				print "changed"
-			print self.save_client.ChattingTable[gid][j]
-		
-	
+			self.text_show.insert(tk.END, i+'\n')
+
 	def disp_group(self):
 		self.Group_list.delete(0,tk.END)
 		self.display_list=[]
@@ -159,25 +147,17 @@ class Window(tk.Frame):
 			to_insert='group:'+item+'->'
 			for el in self.save_client.Grp_Info[item]:
 				to_insert+=el+','
-			self.Group_list.insert(tk.END,to_insert[:-1])	
+			self.Group_list.insert(tk.END,to_insert[:-1])
 
 	def hide(self):
 		self.root.withdraw()
-	# def log_out(self):
-		# self.save_client.status=False
-		# print "log out called"
-	# def log_in(self):
-		# self.save_client.status=False
-		# print "log out called"			
 
 	def log_out(self):
-		print "log out called"
-		self.save_client.status=False
 		self.hide()
 		otherFrame = tk.Toplevel()
 		otherFrame.geometry("400x300")
 		otherFrame.title("otherFrame")
-		Lab=tk.Label(otherFrame,text="You are Logged Out..\n\n\n Enter Your ID to Login")
+		Lab=tk.Label(otherFrame,text="You are Logged Out..")
 		Lab.pack(pady=20)
 
 		in_text=tk.Text(otherFrame,width=10,height=1)
@@ -188,53 +168,41 @@ class Window(tk.Frame):
 		btn.pack()
 
 	def onCloseOtherFrame(self,frame3):
-		print "log in called"
-		self.save_client.status=True
-		gid=self.last_gid
 		frame3.destroy()
 		self.show()
-		print gid
-		if(gid != None):
-			for j in range(len(self.save_client.ChattingTable[gid])):
-				i=self.save_client.ChattingTable[gid][j]
-				print i
-				if( not i[1]):
-					self.save_client.ChattingTable[gid][j]=(i[0],self.save_client.status)
 
 	def show(self):
-		self.disp_group()
-		self.open_group(self.last_gid)
 		self.root.update()
 		self.root.deiconify()
+
 
 class Client(object): # for logout, login for the time assume no logout because we need to store on disk 
 	def __init__(self):
 		if(len(sys.argv)<4):
-			print " usage: python client.py clientID serverportoffest serverAddr"
-			sys.exit(0)
-		if(not self.RepresentsInt(sys.argv[1])):
-			print "User ID must be an integer"
+			print " usage: python client.py serverportoffest clientID option"
 			sys.exit(0)
 		if(not self.RepresentsInt(sys.argv[2])):
+			print "User ID must be an integer"
+			sys.exit(0)
+		if(not self.RepresentsInt(sys.argv[1])):
 			print "serverportoffest must be an integer"
 			sys.exit(0)
-		# if(self.RepresentsInt(sys.argv[3])):
-		# 	if(int(sys.argv[3])!=0 and int(sys.argv[3])!=1):
-		# 		print "only two values allowed 0-new client, 1- old client"
-		# 		sys.exit(0)
-		# 	elif(int(sys.argv[3])==0):
-		# 		print "new client"
-		# 	elif(int(sys.argv[3])==1):
-		# 		print "old Client"	
-		# else:
-		# 	print "only two values allowed 0-new client, 1- old client"
-			# sys.exit(0)
-		self.uid=sys.argv[1]
+		if(self.RepresentsInt(sys.argv[3])):
+			if(int(sys.argv[3])!=0 and int(sys.argv[3])!=1):
+				print "only two values allowed 0-new client, 1- old client"
+				sys.exit(0)
+			elif(int(sys.argv[3])==0):
+				print "new client"
+			elif(int(sys.argv[3])==1):
+				print "old Client"	
+		else:
+			print "only two values allowed 0-new client, 1- old client"
+			sys.exit(0)
+		self.uid=sys.argv[2]
 		self.clocks={}	 # map of gid to VectorClock
 		# self.serverIp=self.get_ip_address('eth0')
-		self.serverIp=sys.argv[3]
-		# self.serverIp="10.5.18.68"
-		self.serverPort=50089+int(sys.argv[2])
+		self.serverIp="10.5.16.68"
+		self.serverPort=50089+int(sys.argv[1])
 		self.clientPort=random.randint(10000,60000)
 		self.ClientId_IP={}
 		self.Grp_Info={}
@@ -245,21 +213,19 @@ class Client(object): # for logout, login for the time assume no logout because 
 		self.uidRecord = []
 		# self.clientIp='0.0.0.0'
 		self.clientIp=self.get_ip_address('eth0')
-		self.status=True
 		# Create two threads as follows
 		self.thread1=True
 		self.gui=None
-		# self.db=MySQLdb.connect("10.5.18.68","12CS10006","btech12","12CS10006")
-		# cursor = self.db.cursor()
-		# sql="SELECT VERSION();"
-		# cursor.execute(sql)
+		self.db=MySQLdb.connect("10.5.18.68","12CS10006","btech12","12CS10006")
+		cursor = self.db.cursor()
+		sql="SELECT VERSION();"
+		cursor.execute(sql)
 		print self.get_ip_address('eth0')  # '192.168.0.110'
 
-		# print cursor.fetchall()
-		# Thread(target=self.execute, args=()).start()
+		print cursor.fetchall()
+		Thread(target=self.execute, args=()).start()
 		self.thread2=True
-		Thread(target=self.RecvAndServe, args=()).start()
-		self.execute()	
+		Thread(target=self.RecvAndServe, args=()).start()	
 
 
 	def get_ip_address(self,ifname):
@@ -297,10 +263,9 @@ class Client(object): # for logout, login for the time assume no logout because 
 					x = self.delay_queue[msg.Group_id].pop(0)
 					print x.text,' delivered by ',x.Client_id,x.Group_id
 					if(x.Group_id in self.ChattingTable.keys()):
-						self.ChattingTable[x.Group_id].append((x.Client_id+" : "+x.text,self.status))
-
+						self.ChattingTable[x.Group_id].append(x.Client_id+" : "+x.text)
 					else:
-						self.ChattingTable[x.Group_id] = [(x.Client_id+" : "+x.text,self.status)]
+						self.ChattingTable[x.Group_id] = [x.Client_id+" : "+x.text]
 					self.gui.open_group(x.Group_id)
 
 			while(msg.Group_id in self.delay_queue and len(self.delay_queue[msg.Group_id]) > 0 and self.delay_queue[msg.Group_id][0].isDeliverable == True):
@@ -308,9 +273,9 @@ class Client(object): # for logout, login for the time assume no logout because 
 				x = self.delay_queue[msg.Group_id].pop(0)
 				print x.text,' delivered by ',x.Client_id,x.Group_id
 				if(x.Group_id in self.ChattingTable.keys()):
-					self.ChattingTable[x.Group_id].append((x.Client_id+" : "+x.text,self.status))
+					self.ChattingTable[x.Group_id].append(x.Client_id+" : "+x.text)
 				else:
-					self.ChattingTable[x.Group_id] = [(x.Client_id+" : "+x.text,self.status)]
+					self.ChattingTable[x.Group_id] = [x.Client_id+" : "+x.text]
 				self.gui.open_group(x.Group_id)
 			if(check == 0):
 				break
@@ -383,8 +348,6 @@ class Client(object): # for logout, login for the time assume no logout because 
 		elif(opt==5): # logout
 			self.thread1=False
 			self.thread2=False
-			# self.gui.log_out()
-			# return
 			sys.exit(0)
 		print textr.get("1.0",'end-1c')
 		textr.delete("1.0",tk.END)		
@@ -464,9 +427,9 @@ class Client(object): # for logout, login for the time assume no logout because 
 				self.uidRecord.append(msg.Client_id)
 				print msg.text,' delivered by ',msg.Client_id,msg.Group_id
 				if(msg.Group_id in self.ChattingTable.keys()):
-					self.ChattingTable[msg.Group_id].append((msg.Client_id+" : "+msg.text,self.status))
+					self.ChattingTable[msg.Group_id].append(msg.Client_id+" : "+msg.text)
 				else:
-					self.ChattingTable[msg.Group_id] = [(msg.Client_id+" : "+msg.text,self.status)]
+					self.ChattingTable[msg.Group_id] = [msg.Client_id+" : "+msg.text]
 				self.gui.open_group(msg.Group_id)
 				if(int(msg.Client_id) != int(self.uid)):
 					clock.increment(int(msg.Client_id)-1)
@@ -500,9 +463,9 @@ class Client(object): # for logout, login for the time assume no logout because 
 						# deliver(msg) 
 						print mesg.text,' delivered by ',mesg.Client_id,mesg.Group_id
 						if(msg.Group_id in self.ChattingTable.keys()):
-							self.ChattingTable[msg.Group_id].append(msg.Client_id+" : "+msg.text,self.status)
+							self.ChattingTable[msg.Group_id].append(msg.Client_id+" : "+msg.text)
 						else:
-							self.ChattingTable[msg.Group_id] = [(msg.Client_id+" : "+msg.text,self.status)]						
+							self.ChattingTable[msg.Group_id] = [msg.Client_id+" : "+msg.text]						
 						self.gui.open_group(msg.Group_id)	
 						if(int(mesg.Client_id) != int(self.uid)):
 							clock.increment(int(mesg.Client_id)-1)
@@ -532,9 +495,9 @@ class Client(object): # for logout, login for the time assume no logout because 
 				# deliver(msg) 
 				print msg.text,' delivered by ',msg.Client_id,msg.Group_id
 				if(msg.Group_id in self.ChattingTable.keys()):
-					self.ChattingTable[msg.Group_id].append((msg.Client_id+" : "+msg.text,self.status))
+					self.ChattingTable[msg.Group_id].append(msg.Client_id+" : "+msg.text)
 				else:
-					self.ChattingTable[msg.Group_id] = [(msg.Client_id+" : "+msg.text,self.status)]				
+					self.ChattingTable[msg.Group_id] = [msg.Client_id+" : "+msg.text]				
 				self.gui.open_group(msg.Group_id)
 				if(int(msg.Client_id) != int(self.uid)):
 					clock.increment(int(msg.Client_id)-1)
@@ -586,9 +549,9 @@ class Client(object): # for logout, login for the time assume no logout because 
 						self.order_queue[mesg.Group_id].remove(x)
 						print mesg.text,' delivered by ',mesg.Client_id,mesg.Group_id
 						if(mesg.Group_id in self.ChattingTable.keys()):
-							self.ChattingTable[msg.Group_id].append((mesg.Client_id+" : "+mesg.text,self.status))
+							self.ChattingTable[msg.Group_id].append(mesg.Client_id+" : "+mesg.text)
 						else:
-							self.ChattingTable[mesg.Group_id] = [(mesg.Client_id+" : "+mesg.text,self.status)]
+							self.ChattingTable[mesg.Group_id] = [mesg.Client_id+" : "+mesg.text]
 						self.gui.open_group(mesg.Group_id)
 						if(int(mesg.Client_id) != int(self.uid)):
 							clock.increment(int(mesg.Client_id)-1)
